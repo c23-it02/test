@@ -4,7 +4,6 @@ from .models import Camera, CamCard, Gallery
 from .forms import AddCameraForm, ListCameraForm
 from .filters import CameraFilter, GalleryFilter
 from .ml_models.camera import open_camera
-from .ml_models.camera_local import open_camera as open_camera_local
 from django.conf import settings
 from datetime import datetime
 from django.utils import timezone
@@ -53,7 +52,9 @@ def home(request):
             picture = request.FILES['picture']
             current_time = timezone.now()
             # Menyimpan file gambar ke sistem file
-            picture_path = os.path.join(settings.MEDIA_ROOT, picture.name)
+            # picture_path = os.path.join(settings.MEDIA_ROOT, picture.name)
+            # Menyimpan file gambar ke Cloud Storage
+            picture_path = settings.GS_BUCKET_NAME
             with open(picture_path, 'wb') as f:
                 for chunk in picture.chunks():
                     f.write(chunk)
@@ -68,15 +69,15 @@ def home(request):
 
             # result = ''
             if result == 0:
-                quantity = 'Not Full'
+                capacity = 'Not Full'
             else:
-                quantity = 'Full'
+                capacity = 'Full'
 
             # Menyimpan data ke dalam model Gallery
             save_to_gallery = Gallery.objects.create(
                 name=name,
                 picture=picture,
-                quantity=str(quantity),
+                capacity=capacity,
                 timestamp=current_time
             )
             save_to_gallery.save()
@@ -148,12 +149,11 @@ def open_cam(request, camera_id):
     global camera_open
 
     if request.method == 'GET':
-        save_folder = os.path.join(settings.BASE_DIR, 'static', 'images', 'trash_can_detector')
 
         if not camera_open:
             try:
                 camera_open = True
-                open_camera(save_folder, camera_id)
+                open_camera(camera_id)
 
                 camera_open = False
             except Exception as e:
@@ -165,31 +165,6 @@ def open_cam(request, camera_id):
             messages.error(request, 'Camera is currently open')
 
     return redirect('trash_can_detector:home')
-
-
-# camera_local_open = False
-# @login_required(login_url='login')
-# def open_cam_local(request, camera_id):
-#     global camera_local_open 
-
-#     if request.method == 'GET':
-#         save_folder = os.path.join(settings.BASE_DIR, 'static', 'images', 'trash_can_detector')
-
-#         if not camera_local_open :
-#             try:
-#                 camera_local_open  = True
-#                 open_camera_local(save_folder, camera_id)
-
-#                 camera_local_open  = False
-#             except Exception as e:
-#                 # Tangkap kesalahan dan kirim pesan error ke pengguna
-#                 camera_local_open  = False
-#                 error_message = f"Kamera tidak dapat terbuka. Kesalahan: {str(e)}"
-#                 messages.error(request, error_message)
-#         else:
-#             messages.error(request, 'Local camera is currently open')
-
-#     return redirect('trash_can_detector:home')
 
 
 # Menambahkan instance Camera

@@ -118,7 +118,7 @@
                     <p class="card-text"><strong>Capacity:</strong>
                       {% for latest_gallery in latest_galleries %}
                         {% if latest_gallery.name.id == card.name.id %}
-                          {{latest_gallery.quantity}}                          
+                          {{latest_gallery.capacity}}                          
                         {% endif %}
                       {% endfor %}
                     </p>

@@ -4,7 +4,7 @@ from .models import Post, DetectedFace, IpCamera
 from .forms import PostForm, IpCameraForm
 from django.http import HttpResponse
 # from .ml_models.test import train
-from .ml_models.main import open_camera
+from .ml_models.main2 import open_camera
 from .filters import DatabaseFilter, DetectedFilter
 from django.conf import settings
 from datetime import date

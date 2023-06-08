@@ -6,6 +6,7 @@ from django.utils import timezone
 import time
 import paho.mqtt.client as mqtt
 import json
+import io
 
 from django.conf import settings
 from trash_can_detector.models import Gallery, Camera, CamCard
@@ -14,6 +15,9 @@ from django.contrib import messages
 from tensorflow.keras.models import load_model
 from tensorflow.keras.utils import load_img, img_to_array
 import numpy as np
+from storages.backends.gcloud import GoogleCloudStorage
+from django.core.files.base import ContentFile
+
 
 # Konfigurasi MQTT
 def on_connect(client, userdata, flags, rc):
@@ -86,11 +90,11 @@ def prediksi(model, tes_path):
         return 1
     return 0
 
-def open_camera(save_folder, cam_id):
+def open_camera(cam_id):
     # Mengambil instance camera sesuai Camera ID
     camera = get_object_or_404(Camera, id=cam_id)
     address = camera.ip_camera
-    cam = cv2.VideoCapture(0)
+    cam = cv2.VideoCapture(address)
     # cam.open(address)
 
     # Cek apakah file counter sudah ada
@@ -124,48 +128,41 @@ def open_camera(save_folder, cam_id):
 
             # Generate photo name
             photo_name = f'{camera.name}-{photo_counter}.jpg'
+ 
+            picture = cv2.imencode('.jpg', frame)[1].tostring()
 
-            # Save photo ke direktory
-            photo_path = os.path.join(settings.BASE_DIR, save_folder, photo_name)
-            cv2.imwrite(photo_path, frame)
-
-            # Simpan photo ke models Gallery
-            # quantity = 1
-            picture = os.path.join(settings.MEDIA_ROOT, 'trash_can_detector', photo_name)
-
+            # Mengunggah file ke Google Cloud Storage
+            gcs = GoogleCloudStorage()
+            file_name = f'{camera.name}-{photo_counter}.jpg'
+            file_path = f'trash_can_detector/{file_name}'  # Nama direktori di google cloud storage
+            content_file = io.BytesIO(picture)
+            gcs.save(file_path, content_file)
 
             # Menghitung prediksi dengan menggunakan model
             path_model = os.path.join(settings.BASE_DIR, 'trash_can_detector', 'ml_models', 'newest_model.h5')
             model = load_model(path_model)
-            result = prediksi(model, picture)
+            result = prediksi(model, content_file)
 
             if result == 0:
-                quantity = 'Not Full'
+                capacity = 'Not Full'
             else:
-                quantity = 'Full'
+                capacity = 'Full'
 
             current_time = timezone.now()
             gallery = Gallery.objects.create(name = camera,
-                                             picture = picture, 
-                                             quantity = quantity,
+                                             picture = file_path, 
+                                             capacity = capacity,
                                              timestamp = current_time
                                              )
             gallery.save()
             
-            formatted_time = current_time.strftime('%d%m%Y%H%M%S')
+            formatted_time = current_time.strftime('%d%m%Y')
             message = {
                     'name': camera.name,
                     'capacity': str(result),
                     'timestamp': formatted_time
                     }
             send_message_to_mqtt(message)
-
-
-            # Mengambil objek CamCard yang terkait dengan objek Gallery yang baru dibuat
-            camcard = CamCard.objects.get(name=camera)
-            camcard.quantity = gallery.quantity
-            camcard.timestamp = gallery.timestamp
-            camcard.save()
 
             photo_counter += 1
             print(f'Photo {photo_name} saved!')

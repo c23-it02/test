@@ -4,7 +4,6 @@ from .models import Camera, CamCard, Gallery
 from .forms import AddCameraForm, ListCameraForm
 from .filters import CameraFilter, GalleryFilter
 from .ml_models.camera import open_camera
-from .ml_models.camera_local import open_camera as open_camera_local
 from django.conf import settings
 from datetime import datetime
 from django.utils import timezone
@@ -43,7 +42,7 @@ def home(request):
             save_to_gallery.save()
 
             # Mengirim pesan melalui MQTT
-            formatted_time = current_time.strftime('%d%m%Y%H%M%S')
+            formatted_time = current_time.strftime('%d%m%Y')
             message = {
                 'name': str(name),
                 'quantity': str(quantity),
@@ -108,13 +107,11 @@ def open_cam(request, camera_id):
     global camera_open
 
     if request.method == 'GET':
-        # Inisiasi tempat menyimpan photo yang dipotret
-        save_folder = os.path.join(settings.BASE_DIR, 'static', 'images', 'memory_tray_detector')
 
         if not camera_open:
             try:
                 camera_open = True
-                open_camera(save_folder, camera_id)
+                open_camera(camera_id)
 
                 camera_open = False
             except Exception as e:
@@ -126,33 +123,6 @@ def open_cam(request, camera_id):
             messages.error(request, 'Camera is currently open')
 
     return redirect('memory_tray_detector:home')
-
-
-# Membuka local camera berdasarkan ID instance Camera
-# camera_local_open = False
-# @login_required(login_url='login')
-# def open_cam_local(request, camera_id):
-#     global camera_local_open
-
-#     if request.method == 'GET':
-#         # Inisiasi tempat menyimpan photo yang dipotret
-#         save_folder = os.path.join(settings.BASE_DIR, 'static', 'images', 'memory_tray_detector')
-
-#         if not camera_local_open:
-#             try:
-#                 camera_local_open = True
-#                 open_camera_local(save_folder, camera_id)
-
-#                 camera_local_open = False
-#             except Exception as e:
-#                 # Tangkap kesalahan dan kirim pesan error ke pengguna
-#                 camera_local_open = False
-#                 error_message = f"Kamera tidak dapat terbuka. Kesalahan: {str(e)}"
-#                 messages.error(request, error_message)
-#         else:
-#             messages.error(request, 'Local camera is currently open')
-
-#     return redirect('memory_tray_detector:home')
 
 
 # Menambahkan instance Camera

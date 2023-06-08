@@ -128,15 +128,38 @@ STATICFILES_DIRS = [
     "static/",
 ]
 
-MEDIA_URL = '/images/'
+# MEDIA_URL = '/images/'
 
-MEDIA_ROOT = BASE_DIR / "static/images"
+# MEDIA_ROOT = BASE_DIR / "static/images"
 
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+# Konfigurasi google cloud storage
+DEFAULT_FILE_STORAGE = 'storages.backends.gcloud.GoogleCloudStorage'
+
+GS_BUCKET_NAME = 'uji-deploy-it02-bucket-2'
+
+STATICFILES_STORAGE = 'storages.backends.gcloud.GoogleCloudStorage'
+
+MEDIA_ROOT = 'images/'
+
+MEDIA_URL = 'https://storage.googleapis.com/{}/'.format(GS_BUCKET_NAME)
+
+from google.oauth2 import service_account
+
+GS_CREDENTIALS = service_account.Credentials.from_service_account_file(
+    "serviceAccount.json"
+)
+
+# Akhir konfigurasi google cloud storage
+
+
+
 
 LOGIN_URL_PERSON_DETECTOR = 'person_detector:login'
 

@@ -1,5 +1,6 @@
 import cv2
 import os
+import io
 import pickle
 from datetime import datetime
 import time
@@ -14,6 +15,8 @@ from django.utils import timezone
 from django.conf import settings
 from memory_tray_detector.models import Gallery, Camera, CamCard
 from django.shortcuts import get_object_or_404
+from storages.backends.gcloud import GoogleCloudStorage
+from django.core.files.base import ContentFile
 
 # Konfigurasi MQTT
 def on_connect(client, userdata, flags, rc):
@@ -72,18 +75,12 @@ def send_message_to_mqtt(pesan):
 # Akhir Konfigurasi
 
 
-def open_camera(save_folder, cam_id):
-    # try:
+def open_camera(cam_id):
         # Mengambil instance camera sesuai Camera ID
         camera = get_object_or_404(Camera, id=cam_id)
         address = camera.ip_camera
-        cam = cv2.VideoCapture(0)
-        # cam.open(address)
-
-        # connected = cam.open(address)
-
-        # if not connected:
-        #     raise socket.error('Tidak dapat terhubung dengan alamat Ip Camera')
+        video_path = os.path.join(settings.BASE_DIR, 'person_detector', 'ml_models', 'video.mp4')
+        cam = cv2.VideoCapture(address)
 
         # Cek apakah file counter sudah ada
         counter_file = os.path.join(settings.BASE_DIR, 'memory_tray_detector', 'ml_models', 'counter.pkl')
@@ -101,8 +98,6 @@ def open_camera(save_folder, cam_id):
         while True:
             check, frame = cam.read()
 
-            # print(frame.shape) 
-
             # Menambahkan teks ke frame
             if show_text:
                 text = f'Photo {camera.name} saved!'
@@ -119,22 +114,27 @@ def open_camera(save_folder, cam_id):
                 # Generate photo name
                 photo_name = f'{camera.name}-{photo_counter}.jpg'
 
-                # Save photo ke direktory
-                photo_path = os.path.join(save_folder, photo_name)
-                cv2.imwrite(photo_path, frame)
+                picture = cv2.imencode('.jpg', frame)[1].tostring()
+
+                # Mengunggah file ke Google Cloud Storage
+                gcs = GoogleCloudStorage()
+                file_name = f'{camera.name}-{photo_counter}.jpg'
+                file_path = f'memory_tray_detector/{file_name}'  # Nama Direktori di google cloud storage
+                content_file = io.BytesIO(picture)
+                gcs.save(file_path, content_file)
 
                 # Simpan photo ke models Gallery
                 quantity = 1
-                picture = os.path.join('memory_tray_detector', photo_name)
-                current_time = datetime.now()
+
+                current_time = timezone.now()
                 gallery = Gallery.objects.create(name = camera,
-                                                picture = picture, 
+                                                picture = file_path, 
                                                 quantity = quantity,
                                                 timestamp = current_time
                                                 )
                 gallery.save()
 
-                formatted_time = current_time.strftime('%d%m%Y%H%M%S')
+                formatted_time = current_time.strftime('%d%m%Y')
                 message = {
                         'name': camera.name,
                         'quantity': str(quantity),
@@ -142,17 +142,9 @@ def open_camera(save_folder, cam_id):
                     }
                 send_message_to_mqtt(message)
 
-
-                # Mengambil objek CamCard yang terkait dengan objek Gallery yang baru dibuat
-                camcard = CamCard.objects.get(name=camera)
-                camcard.quantity = gallery.quantity
-                camcard.timestamp = gallery.timestamp
-                camcard.save()
-
                 photo_counter += 1
                 print(f'Photo {photo_name} saved!')
 
-                # Menampilkan teks selama 3 detik
                 show_text = True
                 text_timer = time.time()
 
@@ -165,6 +157,3 @@ def open_camera(save_folder, cam_id):
         # Simpan nilai counter ke dalam file
         with open(counter_file, 'wb') as f:
             pickle.dump(photo_counter, f)
-    # except Exception as e:
-    #     error_message = f'Kamera tidak dapat terbuka, error: {str(e)}'
-    #     raise Exception(error_message)

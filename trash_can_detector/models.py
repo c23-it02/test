@@ -5,8 +5,8 @@ from django.dispatch import receiver
 # Model untuk Camera
 class Camera(models.Model):
     name = models.CharField(max_length=20)
-    description = models.CharField(max_length=100, null = True)
-    ip_camera = models.CharField(max_length=200, null=True)
+    description = models.CharField(max_length=50, null = True)
+    ip_camera = models.CharField(max_length=100, null=True)
     date_created = models.DateField(auto_now_add=True)
 
     def __str__(self):
@@ -36,7 +36,7 @@ class CamCard(models.Model):
 class Gallery(models.Model):
     name = models.ForeignKey(Camera, on_delete=models.CASCADE)
     picture = models.ImageField(upload_to='trash_can_detector', null=True)
-    quantity = models.CharField(max_length=10,null=True)
+    capacity = models.CharField(max_length=10,null=True)
     timestamp = models.DateTimeField()
     detected_day = models.DateField(auto_now_add=True)
 
